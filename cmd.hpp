@@ -91,11 +91,11 @@ namespace cmd
                 return false;
 
             return detail::index_upto<sizeof...(Args)>([&](auto... is) {
-                auto optargs = std::tuple{from_string<Args>{}(std::move(toks[is]))...};
+                auto optargs = std::tuple{from_string<std::remove_cvref_t<Args>>{}(std::move(toks[is]))...};
                 if((!get<is>(optargs) || ...))
                     return false;
                 auto fn = (R(*)(Args...))uf;
-                fn(std::move(*get<is>(optargs))...);
+                fn(std::forward<Args>(*get<is>(optargs))...);
                 return true;
             });
         }
@@ -207,12 +207,17 @@ namespace cmd
             if(quote || toks.empty())
                 return false;
 
-            auto it = table.find(toks[0]);
+            return call(toks[0], std::span{toks}.subspan(1));
+        }
+
+        bool call(const std::string& name, std::span<std::string> toks)
+        {
+            auto it = table.find(name);
             if(it == table.end())
                 return false;
 
             auto ef = it->second;
-            return ef.call(std::span{toks}.subspan(1));
+            return ef.call(toks);
         }
 
         template <typename R, typename... Args>
