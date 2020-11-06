@@ -8,10 +8,10 @@ r.register_func("foo", &foo);
 auto success = r.call("foo 42");
 ````
 
-The return value of the function is ignored.
-The arguments are parsed like bash, supporting quoting.
-If parsing fails, success is false and the function isn't called.
-The string is converted to their respective arguments by calling `erasure::from_string<T>{}(token)`.
+The return value of the function is ignored.  
+The arguments are parsed like bash, supporting quoting.  
+If parsing fails, success is false and the function isn't called.  
+
 
 # Installation
 erasure is header only, just `#include"erasure.hpp"`.
