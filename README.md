@@ -32,6 +32,6 @@ Strings are converted to their respective argument types by `from_string<T>{}(st
 It is specialized for `std::string`, `std::string_view`, integral types and floating types.  
 You may specialize `from_string` to support other types.
 
-#### `std::optional<T> from_string<T>::operator()(std::constructible_from<std::string&&> auto token)`
+#### `std::optional<T> from_string<T>::operator()(/* constructible from std::string&& */ token)`
 If parsing fails, the optional should be empty.
 
