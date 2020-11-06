@@ -28,6 +28,6 @@ Registers the function as the given name.
 Calls a registered function command line style. Returns false if the function name is unrecognized or parsing fails.
 
 ## from_string
-Strings are converted to their respective argument types by `from_string<T>{}(token)`.
+Strings are converted to their respective argument types by `from_string<T>{}(std::move(token))`.
 It is specialized for `std::string`, `std::string_view`, integral types and floating types.
 You may specialize `from_string` to support other types.
