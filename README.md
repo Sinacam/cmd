@@ -18,20 +18,20 @@ cmd is header only, just `#include"cmd.hpp"`.
 
 # Documentation
 
-## `registry`
+### `registry`
 `registry` is a regular type.
 
-### `void registry::register_func(const std::string& name, R (*fn)(Args...))`
+#### `void registry::register_func(const std::string& name, R (*fn)(Args...))`
 Registers the function as the given name.
 
-### `bool registry::call(std::string_view line)`
+#### `bool registry::call(std::string_view line)`
 Calls a registered function command line style. Returns false if the function name is unrecognized or parsing fails.
 
-## `from_string`
+### `from_string`
 Strings are converted to their respective argument types by `from_string<T>{}(std::move(token))`.  
 It is specialized for `std::string`, `std::string_view`, integral types and floating types.  
 You may specialize `from_string` to support other types.
 
-### `std::optional<T> from_string<T>::operator()(std::constructible_from<std::string&&> auto token)`
+#### `std::optional<T> from_string<T>::operator()(std::constructible_from<std::string&&> auto token)`
 If parsing fails, the optional should be empty.
 
