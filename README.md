@@ -3,7 +3,7 @@ erasure is a library for calling functions via command line style strings that i
 
 ````c++
 void foo(int);
-registry r;
+erasure::registry r;
 r.register_func("foo", &foo);
 auto success = r.call("foo 42");
 ````
