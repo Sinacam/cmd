@@ -1,9 +1,9 @@
-# erasure
-erasure is a library for calling functions via command line style strings that is fully type-safe
+# cmd
+cmd is a library for calling functions via command line style strings that is fully type-safe
 
 ````c++
 void foo(int);
-erasure::registry r;
+cmd::registry r;
 r.register_func("foo", &foo);
 auto success = r.call("foo 42");
 ````
@@ -14,7 +14,7 @@ If parsing fails, success is false and the function isn't called.
 
 
 # Installation
-erasure is header only, just `#include"erasure.hpp"`.
+cmd is header only, just `#include"cmd.hpp"`.
 
 # Documentation
 
