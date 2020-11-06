@@ -14,7 +14,7 @@ If parsing fails, success is false and the function isn't called.
 
 
 # Installation
-cmd is header only, just `#include"cmd.hpp"`.
+cmd is header only, just `#include"cmd.hpp"`. Requires C++20.
 
 # Documentation
 
