@@ -40,11 +40,8 @@ namespace cmd
 
     // from_string is the customization point for converting a token to the argument type.
     // from_string is already specialized for std::string_view, std::string, integral types and floating types.
-    template <typename T>
-    struct from_string
-    {
-        static_assert(must_specialize<T>::value, "from_string must be specialized to parse that type");
-    };
+    template <typename>
+    struct from_string;
 
     // Integral types and floating types depends on std::from_chars,
     // which most compilers haven't implemented yet, sadly.
@@ -77,6 +74,51 @@ namespace cmd
         std::optional<std::string> operator()(std::string tok) { return tok; }
     };
 
+    // to_string is the customization point for converting the return type to std::string.
+    // to_string is already specialized for void, std::string, integral types and floating types.
+    template<typename T>
+    struct to_string;
+
+    template<>
+    struct to_string<void> {};
+
+    template<typename T>
+    requires requires(T& x, char* buf)
+    {
+        std::to_chars(buf, buf, x);
+    }
+    struct to_string<T>
+    {
+        std::string operator()(T x)
+        {
+            char buf[32];    // TODO: check correct length
+            auto res = std::to_chars(buf, buf + sizeof(buf), x);
+            return {buf, res.ptr};
+        }
+    };
+
+    template<>
+    struct to_string<std::string>
+    {
+        std::string operator()(std::string&& x)
+        {
+            return std::move(x);
+        }
+    };
+
+    template<typename T>
+    concept from_stringable = requires (std::string_view s, from_string<std::remove_cvref_t<T>> fs)
+    {
+        bool(fs(s));
+        { *fs(s) } -> std::convertible_to<std::remove_cvref_t<T>>;
+    };
+
+    template<typename T>
+    concept to_stringable = std::is_void_v<T> || requires (T x) { to_string<std::remove_cvref_t<T>>{}(x); };
+
+    template<typename R, typename... Args>
+    concept stringable = (to_stringable<R> && ... && from_stringable<Args>);
+
     // erased_func is a type-erased function which can be called with a span of strings,
     // where each string is converted to their respective argument by from_string.
     // erased_func can be constructed from a function pointer.
@@ -85,33 +127,43 @@ namespace cmd
         using untyped_func = void();
 
         template <typename R, typename... Args>
-        static bool dispatch_func(untyped_func* uf, std::span<std::string> toks)
+        static std::optional<std::string> dispatch_func(untyped_func* uf, std::span<std::string> toks)
         {
             if(toks.size() != sizeof...(Args))
-                return false;
+                return {};
 
-            return detail::index_upto<sizeof...(Args)>([&](auto... is) {
+            return detail::index_upto<sizeof...(Args)>([&](auto... is) -> std::optional<std::string> {
                 auto optargs = std::tuple{from_string<std::remove_cvref_t<Args>>{}(std::move(toks[is]))...};
                 if((!get<is>(optargs) || ...))
-                    return false;
+                    return {};
                 auto fn = (R(*)(Args...))uf;
-                fn(std::forward<Args>(*get<is>(optargs))...);
-                return true;
+                using rR = std::remove_cvref_t<R>;
+                if constexpr(!std::is_void_v<rR>)
+                {
+                    auto ret = fn(std::forward<Args>(*get<is>(optargs))...);
+                    return to_string<rR>{}(std::move(ret));
+                }
+                else
+                {
+                    fn(std::forward<Args>(*get<is>(optargs))...);
+                    return "";
+                }
             });
         }
 
       public:
         erased_func() = default;
         template <typename R, typename... Args>
+        requires stringable<R, Args...>
         erased_func(R (*fn)(Args...))
             : dispatch{dispatch_func<R, Args...>}, fn{(untyped_func*)fn}
         {
         }
 
-        bool call(std::span<std::string> toks) { return dispatch(fn, toks); }
+        std::optional<std::string> call(std::span<std::string> toks) { return dispatch(fn, toks); }
 
       private:
-        bool (*dispatch)(untyped_func*, std::span<std::string>) = nullptr;
+        std::optional<std::string> (*dispatch)(untyped_func*, std::span<std::string>) = nullptr;
         untyped_func* fn = nullptr;
     };
 
@@ -189,38 +241,41 @@ namespace cmd
 
     // registry holds registered functions that can later be called command line style with
     // full type-safety, e.g.
-    //      void foo(int);
+    //      int foo(int);
     //      registry r;
     //      r.register_func("foo", &foo);
-    //      auto success = r.call("foo 42");
-    // The return value of the function is ignored.
+    //      auto opt = r.call("foo 42");
+    // calls foo(42) and returns  the result as as an std::optional<std::string>.
     // The arguments are parsed like bash, supporting quoting.
-    // If parsing fails, success is false and the function isn't called.
-    // The string is converted to their respective arguments by calling
+    // If parsing fails, opt is empty and the function isn't called.
+    // The string is tokenized and converted to their respective arguments by calling
     //      from_string<T>{}(token);
+    // The return value of the function is converted to std::string by
+    //      to_string<T>{}(return_value);
     class registry
     {
       public:
-        bool call(std::string_view line)
+        std::optional<std::string> call(std::string_view line)
         {
             auto [toks, quote] = tokenize(line);
             if(quote || toks.empty())
-                return false;
+                return {};
 
             return call(toks[0], std::span{toks}.subspan(1));
         }
 
-        bool call(const std::string& name, std::span<std::string> toks)
+        std::optional<std::string> call(const std::string& name, std::span<std::string> toks)
         {
             auto it = table.find(name);
             if(it == table.end())
-                return false;
+                return {};
 
             auto ef = it->second;
             return ef.call(toks);
         }
 
         template <typename R, typename... Args>
+        requires stringable<R, Args...>
         void register_func(const std::string& name, R (*fn)(Args...))
         {
             table[name] = fn;
