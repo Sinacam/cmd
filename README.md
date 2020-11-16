@@ -42,5 +42,5 @@ It is specialized for `void`, `std::string`, integral types and floating types.
 You may specialize `to_string` to support other types.
 
 #### `std::string to_string<T>::operator()(/* constructible from rvalue of T */ return_value)`
-Only called on successfully calling the funciton.
+Only called on successfully calling the function.
 
