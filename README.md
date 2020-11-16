@@ -2,7 +2,7 @@
 cmd is a library for calling functions via command line style strings that is fully type-safe
 
 ````c++
-void foo(int);
+double foo(int);
 cmd::registry r;
 r.register_func("foo", &foo);
 auto opt = r.call("foo 42");
