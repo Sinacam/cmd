@@ -35,11 +35,14 @@ namespace cmd
         }
     } // namespace detail
 
-    template<typename>
-    struct must_specialize : std::false_type {};
+    template <typename>
+    struct must_specialize : std::false_type
+    {
+    };
 
     // from_string is the customization point for converting a token to the argument type.
-    // from_string is already specialized for std::string_view, std::string, integral types and floating types.
+    // from_string is already specialized for std::string_view, std::string, integral types and
+    // floating types.
     template <typename>
     struct from_string;
 
@@ -68,7 +71,7 @@ namespace cmd
         std::optional<std::string_view> operator()(std::string_view tok) { return tok; }
     };
 
-    template<>
+    template <>
     struct from_string<std::string>
     {
         std::optional<std::string> operator()(std::string tok) { return tok; }
@@ -76,13 +79,15 @@ namespace cmd
 
     // to_string is the customization point for converting the return type to std::string.
     // to_string is already specialized for void, std::string, integral types and floating types.
-    template<typename T>
+    template <typename T>
     struct to_string;
 
-    template<>
-    struct to_string<void> {};
+    template <>
+    struct to_string<void>
+    {
+    };
 
-    template<typename T>
+    template <typename T>
     requires requires(T& x, char* buf)
     {
         std::to_chars(buf, buf, x);
@@ -91,32 +96,35 @@ namespace cmd
     {
         std::string operator()(T x)
         {
-            char buf[32];    // TODO: check correct length
+            char buf[32]; // TODO: check correct length
             auto res = std::to_chars(buf, buf + sizeof(buf), x);
             return {buf, res.ptr};
         }
     };
 
-    template<>
+    template <>
     struct to_string<std::string>
     {
-        std::string operator()(std::string&& x)
-        {
-            return std::move(x);
-        }
+        std::string operator()(std::string&& x) { return std::move(x); }
     };
 
-    template<typename T>
-    concept from_stringable = requires (std::string_view s, from_string<std::remove_cvref_t<T>> fs)
+    template <typename T>
+    concept from_stringable = requires(std::string_view s, from_string<std::remove_cvref_t<T>> fs)
     {
         bool(fs(s));
-        { *fs(s) } -> std::convertible_to<std::remove_cvref_t<T>>;
+        {
+            *fs(s)
+        }
+        ->std::convertible_to<std::remove_cvref_t<T>>;
     };
 
-    template<typename T>
-    concept to_stringable = std::is_void_v<T> || requires (T x) { to_string<std::remove_cvref_t<T>>{}(x); };
+    template <typename T>
+    concept to_stringable = std::is_void_v<T> || requires(T x)
+    {
+        to_string<std::remove_cvref_t<T>>{}(x);
+    };
 
-    template<typename R, typename... Args>
+    template <typename R, typename... Args>
     concept stringable = (to_stringable<R> && ... && from_stringable<Args>);
 
     // erased_func is a type-erased function which can be called with a span of strings,
@@ -127,35 +135,37 @@ namespace cmd
         using untyped_func = void();
 
         template <typename R, typename... Args>
-        static std::optional<std::string> dispatch_func(untyped_func* uf, std::span<std::string> toks)
+        static std::optional<std::string> dispatch_func(untyped_func* uf,
+                                                        std::span<std::string> toks)
         {
             if(toks.size() != sizeof...(Args))
                 return {};
 
-            return detail::index_upto<sizeof...(Args)>([&](auto... is) -> std::optional<std::string> {
-                auto optargs = std::tuple{from_string<std::remove_cvref_t<Args>>{}(std::move(toks[is]))...};
-                if((!get<is>(optargs) || ...))
-                    return {};
-                auto fn = (R(*)(Args...))uf;
-                using rR = std::remove_cvref_t<R>;
-                if constexpr(!std::is_void_v<rR>)
-                {
-                    auto ret = fn(std::forward<Args>(*get<is>(optargs))...);
-                    return to_string<rR>{}(std::move(ret));
-                }
-                else
-                {
-                    fn(std::forward<Args>(*get<is>(optargs))...);
-                    return "";
-                }
-            });
+            return detail::index_upto<sizeof...(Args)>(
+                [&](auto... is) -> std::optional<std::string> {
+                    auto optargs = std::tuple{
+                        from_string<std::remove_cvref_t<Args>>{}(std::move(toks[is]))...};
+                    if((!get<is>(optargs) || ...))
+                        return {};
+                    auto fn = (R(*)(Args...))uf;
+                    using rR = std::remove_cvref_t<R>;
+                    if constexpr(!std::is_void_v<rR>)
+                    {
+                        auto ret = fn(std::forward<Args>(*get<is>(optargs))...);
+                        return to_string<rR>{}(std::move(ret));
+                    }
+                    else
+                    {
+                        fn(std::forward<Args>(*get<is>(optargs))...);
+                        return "";
+                    }
+                });
         }
 
       public:
         erased_func() = default;
         template <typename R, typename... Args>
-        requires stringable<R, Args...>
-        erased_func(R (*fn)(Args...))
+        requires stringable<R, Args...> erased_func(R (*fn)(Args...))
             : dispatch{dispatch_func<R, Args...>}, fn{(untyped_func*)fn}
         {
         }
@@ -176,7 +186,7 @@ namespace cmd
     // returns the tokens and whether there is an unclosed quote.
     std::pair<std::vector<std::string>, char> tokenize(std::string_view line)
     {
-        bool sq = false, dq = false;    // within single and double quotes
+        bool sq = false, dq = false; // within single and double quotes
         std::vector<std::string> toks;
         std::string cur;
         while(line.size() > 0)
@@ -275,8 +285,8 @@ namespace cmd
         }
 
         template <typename R, typename... Args>
-        requires stringable<R, Args...>
-        void register_func(const std::string& name, R (*fn)(Args...))
+        requires stringable<R, Args...> void register_func(const std::string& name,
+                                                           R (*fn)(Args...))
         {
             table[name] = fn;
         }
