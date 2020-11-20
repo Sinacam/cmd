@@ -12,6 +12,8 @@
 #include <utility>
 #include <vector>
 
+#include "ztd/ztd.hpp"
+
 namespace cmd
 {
     using std::size_t;
@@ -134,7 +136,7 @@ namespace cmd
     {
         using untyped_func = void();
 
-        template <typename R, typename... Args>
+        template <typename Callable, typename R, typename... Args>
         static std::optional<std::string> dispatch_func(untyped_func* uf,
                                                         std::span<std::string> toks)
         {
@@ -147,7 +149,14 @@ namespace cmd
                         from_string<std::remove_cvref_t<Args>>{}(std::move(toks[is]))...};
                     if((!get<is>(optargs) || ...))
                         return {};
-                    auto fn = (R(*)(Args...))uf;
+
+                    auto fn = [uf] {
+                        if constexpr(std::is_function_v<Callable>)
+                            return (R(*)(Args...))uf;
+                        else
+                            return Callable{};
+                    }();
+
                     using rR = std::remove_cvref_t<R>;
                     if constexpr(!std::is_void_v<rR>)
                     {
@@ -162,11 +171,27 @@ namespace cmd
                 });
         }
 
+        template <typename Callable, typename R, typename... Args>
+        erased_func(std::type_identity<Callable>, R (*)(Args...))
+            : dispatch{dispatch_func<Callable, R, Args...>}, fn{nullptr}
+        {
+        }
+
       public:
         erased_func() = default;
         template <typename R, typename... Args>
         requires stringable<R, Args...> erased_func(R (*fn)(Args...))
-            : dispatch{dispatch_func<R, Args...>}, fn{(untyped_func*)fn}
+            : dispatch{dispatch_func<R(Args...), R, Args...>}, fn{(untyped_func*)fn}
+        {
+        }
+
+        template <typename T>
+        requires std::is_empty_v<T> && requires {
+            &T::operator();
+        }
+        erased_func(T)
+            : erased_func{std::type_identity<T>{},
+                          (typename ztd::mfp_traits<decltype(&T::operator())>::base_type*)nullptr}
         {
         }
 
@@ -291,9 +316,32 @@ namespace cmd
             table[name] = fn;
         }
 
+        template <typename Callable>
+        requires std::is_empty_v<Callable> && requires { &Callable::operator(); }
+        void register_func(const std::string& name, Callable callable)
+        {
+            table[name] = callable;
+        }
+
       private:
         std::unordered_map<std::string, erased_func> table;
     };
+
+    template<typename T, T>
+    struct function;
+
+    template<typename R, typename... Args, R (*fn)(Args...)>
+    struct function<R (*)(Args...), fn>
+    {
+        R operator()(Args... args)
+        {
+            return fn(std::forward<Args>(args)...);
+        }
+    };
+
+    template<auto x>
+    inline constexpr function<decltype(x), x> func;
+
 } // namespace cmd
 
 #endif

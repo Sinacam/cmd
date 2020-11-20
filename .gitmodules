@@ -1,0 +1,3 @@
+[submodule "ztd"]
+	path = ztd
+	url = https://github.com/Sinacam/ztd
