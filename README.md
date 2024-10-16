@@ -8,7 +8,7 @@ r.register_func("foo", &foo);
 auto opt = r.call("foo 42");
 ````
 Calls `foo(42)` and returns  the result as as an `std::optional<std::string>`.  
-The arguments are parsed like bash, supporting quoting.  
+The arguments are separated by spaces, unless they are inside single or double quotes.  
 If parsing fails, `opt` is empty and the function isn't called.
 
 
